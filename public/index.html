@@ -93,4 +93,334 @@
       color: var(--blue);
       font-size: 14px;
       font-weight: 700;
-      letter-spacing:
+      letter-spacing: 0.08em;
+    }
+
+    .price {
+      margin: 6px 0;
+      font-size: clamp(40px, 7vw, 54px);
+      font-weight: 750;
+      letter-spacing: -0.04em;
+    }
+
+    .change {
+      margin: 8px 0 18px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .positive {
+      color: var(--green);
+    }
+
+    .negative {
+      color: var(--red);
+    }
+
+    .neutral {
+      color: var(--yellow);
+    }
+
+    .meta {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .loading {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .error {
+      color: var(--red);
+      line-height: 1.5;
+    }
+
+    .news-item {
+      padding: 15px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .news-item:first-child {
+      padding-top: 0;
+    }
+
+    .news-item:last-child {
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+
+    .news-title {
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 650;
+      line-height: 1.45;
+      text-decoration: none;
+    }
+
+    .news-title:hover,
+    .news-title:focus {
+      color: var(--blue);
+      text-decoration: underline;
+    }
+
+    .news-meta {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .footer {
+      margin: 20px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    button {
+      margin-top: 18px;
+      padding: 10px 14px;
+      border: 1px solid #0ea5e9;
+      border-radius: 9px;
+      color: #082f49;
+      background: var(--blue);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    button:hover {
+      background: #7dd3fc;
+    }
+
+    @media (max-width: 800px) {
+      body {
+        padding: 16px;
+      }
+
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <header>
+      <div>
+        <h1>VOO Dashboard</h1>
+        <p class="subtitle">Vanguard S&amp;P 500 ETF — price and latest related news</p>
+      </div>
+      <div id="last-updated" class="market-status">Loading data…</div>
+    </header>
+
+    <section class="grid">
+      <article class="card">
+        <h2>Market price</h2>
+
+        <div id="stock-content">
+          <p class="loading">Loading VOO price…</p>
+        </div>
+
+        <button id="refresh-button" type="button">Refresh data</button>
+      </article>
+
+      <article class="card">
+        <h2>Latest news</h2>
+
+        <div id="news-content">
+          <p class="loading">Loading VOO news…</p>
+        </div>
+      </article>
+    </section>
+
+    <p class="footer">
+      Informational only — not investment advice. Data may be delayed, unavailable,
+      or inaccurate. Verify prices and news through your broker or official sources
+      before making an investment decision.
+    </p>
+  </main>
+
+  <script>
+    const stockContent = document.getElementById("stock-content");
+    const newsContent = document.getElementById("news-content");
+    const lastUpdated = document.getElementById("last-updated");
+    const refreshButton = document.getElementById("refresh-button");
+
+    function formatMoney(value) {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(value);
+    }
+
+    function formatTimestamp(unixSeconds) {
+      if (!unixSeconds) return "Time unavailable";
+
+      return new Intl.DateTimeFormat("en-US", {
+        dateStyle: "medium",
+        timeStyle: "short"
+      }).format(new Date(unixSeconds * 1000));
+    }
+
+    function formatNewsDate(value) {
+      if (!value) return "";
+
+      const date = new Date(value);
+
+      if (Number.isNaN(date.getTime())) {
+        return value;
+      }
+
+      return new Intl.DateTimeFormat("en-US", {
+        dateStyle: "medium",
+        timeStyle: "short"
+      }).format(date);
+    }
+
+    function escapeHtml(value) {
+      const element = document.createElement("div");
+      element.textContent = String(value || "");
+      return element.innerHTML;
+    }
+
+    async function loadStock() {
+      stockContent.innerHTML = '<p class="loading">Loading VOO price…</p>';
+
+      try {
+        const response = await fetch("/api/stock", {
+          cache: "no-store"
+        });
+
+        if (!response.ok) {
+          throw new Error("Stock request failed");
+        }
+
+        const data = await response.json();
+
+        if (
+          typeof data.price !== "number" ||
+          typeof data.change !== "number" ||
+          typeof data.changePercent !== "number"
+        ) {
+          throw new Error("Incomplete stock data");
+        }
+
+        const direction =
+          data.change > 0 ? "positive" :
+          data.change < 0 ? "negative" :
+          "neutral";
+
+        const sign = data.change > 0 ? "+" : "";
+
+        stockContent.innerHTML = `
+          <div class="ticker">${escapeHtml(data.symbol || "VOO")}</div>
+          <div class="price">${formatMoney(data.price)}</div>
+          <div class="change ${direction}">
+            ${sign}${formatMoney(data.change)}
+            (${sign}${data.changePercent.toFixed(2)}%)
+          </div>
+          <p class="meta">
+            ${escapeHtml(data.exchange || "US market")}<br />
+            Price timestamp: ${escapeHtml(formatTimestamp(data.timestamp))}
+          </p>
+        `;
+      } catch (error) {
+        console.error(error);
+
+        stockContent.innerHTML = `
+          <p class="error">
+            VOO price data is temporarily unavailable. Please refresh and try again.
+          </p>
+        `;
+      }
+    }
+
+    async function loadNews() {
+      newsContent.innerHTML = '<p class="loading">Loading VOO news…</p>';
+
+      try {
+        const response = await fetch("/api/news", {
+          cache: "no-store"
+        });
+
+        if (!response.ok) {
+          throw new Error("News request failed");
+        }
+
+        const data = await response.json();
+        const articles = Array.isArray(data.articles) ? data.articles : [];
+
+        if (articles.length === 0) {
+          newsContent.innerHTML =
+            '<p class="loading">No recent VOO news is available.</p>';
+          return;
+        }
+
+        newsContent.innerHTML = articles
+          .slice(0, 10)
+          .map((article) => {
+            const title = escapeHtml(article.title || "Untitled article");
+            const source = escapeHtml(article.source || "Financial news");
+            const date = escapeHtml(formatNewsDate(article.pubDate));
+            const url = article.link || "#";
+
+            return `
+              <article class="news-item">
+                <a
+                  class="news-title"
+                  href="${url}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  ${title}
+                </a>
+                <div class="news-meta">
+                  ${source}${date ? ` · ${date}` : ""}
+                </div>
+              </article>
+            `;
+          })
+          .join("");
+      } catch (error) {
+        console.error(error);
+
+        newsContent.innerHTML = `
+          <p class="error">
+            News is temporarily unavailable. Please refresh and try again.
+          </p>
+        `;
+      }
+    }
+
+    async function refreshDashboard() {
+      refreshButton.disabled = true;
+      refreshButton.textContent = "Refreshing…";
+
+      await Promise.all([loadStock(), loadNews()]);
+
+      lastUpdated.textContent =
+        `Dashboard updated: ${new Date().toLocaleString()}`;
+
+      refreshButton.disabled = false;
+      refreshButton.textContent = "Refresh data";
+    }
+
+    refreshButton.addEventListener("click", refreshDashboard);
+
+    refreshDashboard();
+
+    setInterval(refreshDashboard, 60000);
+  </script>
+</body>
+</html>

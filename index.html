@@ -32,10 +32,10 @@ small{color:#6b7280}
 <header>
   <div>
     <h1>VOO Dashboard</h1>
-    <small>¸ê®Æ¶È¨Ñ°Ñ¦Ò¡A¤£ºc¦¨§ë¸ê«ØÄ³</small>
+    <small>For ref only</small>
   </div>
   <div>
-    <span id="price">¸ü¤J¤¤¡K</span>
+    <span id="price">loadingâ€¦</span>
     <span id="change"></span>
   </div>
 </header>
@@ -51,21 +51,21 @@ small{color:#6b7280}
 
 <section class="card">
   <canvas id="chart"></canvas>
-  <div id="chartStatus" class="status">¸ü¤J¤¤¡K</div>
+  <div id="chartStatus" class="status">loadingâ€¦</div>
 </section>
 
 <div class="grid">
   <section class="card">
-    <h2>³Ìªñ·s»D</h2>
-    <div id="news">¸ü¤J¤¤¡K</div>
+    <h2>Recent news</h2>
+    <div id="news">loadingâ€¦</div>
   </section>
 
   <section class="card">
-    <h2>§ó·s¸ê°T</h2>
+    <h2>Latest news</h2>
     <p class="status">
-      ªÑ»ù¤Î·s»D¸ê®Æ¨Ó¦Û§K¶O¤½¶}¸ê®Æ¨Ó·½¡C<br>
-      ºô­¶¶}±Ò´Á¶¡¬ù¨C 15 ¤ÀÄÁ§ó·s¤@¦¸¡C<br>
-      ¤£¨Ï¥Î AI API¡A¤]¤£·|¦Û°Ê¤Á´«¥I¶OªA°È¡C
+      Public info<br>
+      updates<br>
+      wont use API
     </p>
     <p id="lastUpdate" class="status"></p>
   </section>
@@ -85,11 +85,11 @@ let prices = [];
 const $ = id => document.getElementById(id);
 
 async function loadChart() {
-  $("chartStatus").textContent = "¥¿¦b§ó·sªÑ»ù¡K";
+  $("chartStatus").textContent = "updating the price";
 
   try {
     const r = await fetch(chartApi(currentRange));
-    if (!r.ok) throw new Error("ªÑ»ù¸ê®ÆµLªk¨ú±o");
+    if (!r.ok) throw new Error("failed to obtain");
 
     const data = await r.json();
     const result = data.chart.result[0];
@@ -100,7 +100,7 @@ async function loadChart() {
       .map((t, i) => ({time: new Date(t * 1000), value: values[i]}))
       .filter(x => Number.isFinite(x.value));
 
-    if (!prices.length) throw new Error("¨S¦³ªÑ»ù¸ê®Æ");
+    if (!prices.length) throw new Error("no stock info");
 
     const last = prices[prices.length - 1].value;
     const previous = prices.length > 1
@@ -117,10 +117,10 @@ async function loadChart() {
 
     drawChart();
     $("chartStatus").textContent =
-      `³Ì«á¸ê®Æ¡G${prices[prices.length - 1].time.toLocaleDateString()}`;
+      `last infoï¼š${prices[prices.length - 1].time.toLocaleDateString()}`;
   } catch (e) {
     $("chartStatus").textContent =
-      "ªÑ»ù¼È®ÉµLªk¨ú±o¡A¥i¯à¬O§K¶O¸ê®Æ¨Ó·½­­¨î¡C";
+      "restrictedã€‚";
   }
 }
 
@@ -173,16 +173,16 @@ function drawChart() {
 }
 
 async function loadNews() {
-  $("news").textContent = "¥¿¦b§ó·s·s»D¡K";
+  $("news").textContent = "now updating";
 
   try {
     const r = await fetch(newsApi);
-    if (!r.ok) throw new Error("·s»D¸ê®ÆµLªk¨ú±o");
+    if (!r.ok) throw new Error("failed");
 
     const data = await r.json();
     const news = (data.news || []).slice(0, 8);
 
-    if (!news.length) throw new Error("¨S¦³·s»D");
+    if (!news.length) throw new Error("Nil");
 
     $("news").innerHTML = news.map(item => {
       const date = item.providerPublishTime
@@ -192,7 +192,7 @@ async function loadNews() {
       return `
         <div class="news">
           <a href="${item.link}" target="_blank" rel="noopener noreferrer">
-            ${escapeHtml(item.title || "¥¼©R¦W·s»D")}
+            ${escapeHtml(item.title || "unknwon")}
           </a>
           <br>
           <small>${escapeHtml(item.publisher || "")} ${date}</small>
@@ -200,7 +200,7 @@ async function loadNews() {
     }).join("");
   } catch (e) {
     $("news").textContent =
-      "·s»D¼È®ÉµLªk¨ú±o¡A¥i¯à¬O§K¶O¸ê®Æ¨Ó·½­­¨î¡C";
+      "Restricted";
   }
 }
 
@@ -217,7 +217,7 @@ function escapeHtml(text) {
 async function updateAll() {
   await Promise.all([loadChart(), loadNews()]);
   $("lastUpdate").textContent =
-    "¥»­¶³Ì«á§ó·s¡G" + new Date().toLocaleString();
+    "last updated at" + new Date().toLocaleString();
 }
 
 document.querySelectorAll("button").forEach(button => {

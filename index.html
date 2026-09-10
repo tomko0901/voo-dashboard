@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <!-- 強制採用 UTF-8 編碼，徹底根治 GitHub Pages 上的亂碼問題 -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VOO Dashboard 看板</title>
@@ -70,7 +69,7 @@
         }
         .chart-container {
             position: relative;
-            height: 500px;
+            height: 520px;
             width: 100%;
         }
         .news-list {
@@ -115,7 +114,6 @@
 <body>
 
 <div class="container">
-    <!-- 頂部狀態列 -->
     <div class="header">
         <h1>VOO Vanguard S&P 500 ETF 看板</h1>
         <div class="status-tag" id="update-status">
@@ -123,43 +121,38 @@
         </div>
     </div>
 
-    <!-- 錯誤回報防禦區塊 -->
+    <!-- 降級防禦警示區域 -->
     <div id="global-error" class="error-message"></div>
 
     <div class="dashboard-grid">
-        <!-- 左側：TradingView 專業圖表 (自帶 1M, 3M, 1Y, MAX 等按鈕) -->
+        <!-- 左側：TradingView 高級高級圖表（自帶 1D, 1M, 3M, 1Y 全套按鈕功能） -->
         <div class="card">
             <h2>VOO 股價趨勢圖</h2>
             <div class="chart-container">
-                <!-- 接入 TradingView 官方免費圖表元件 -->
-                <div id="tradingview_voo_chart" style="width: 100%; height: 100%;"></div>
+                <!-- 嵌入 TradingView 官方小組件 -->
+                <div id="tradingview_voo_widget" style="width:100%; height:100%;"></div>
             </div>
         </div>
 
-        <!-- 右側：免費最新相關新聞連結 -->
+        <!-- 右側：修復後的 Google 免費財經新聞 -->
         <div class="card">
             <h2>VOO / S&P 500 最新新聞</h2>
             <div id="news-loading" style="color: #718096; font-size: 14px;">新聞加載中...</div>
-            <ul class="news-list" id="news-container">
-                <!-- 新聞內容會透過免費用戶端腳本動態注入此處 -->
-            </ul>
+            <ul class="news-list" id="news-container"></ul>
         </div>
     </div>
 </div>
 
-<!-- 引入 TradingView 官方免費核心渲染指令庫 -->
+<!-- 1. 引入 TradingView 官方核心渲染引擎 -->
 <script type="text/javascript" src="https://tradingview.com"></script>
 
 <script type="text/javascript">
-    let tvWidget = null;
-
-    // 1. 調用 TradingView 官方元件渲染 VOO 的 K 線/趨勢圖
-    function loadTradingViewChart() {
+    // 渲染真正的 VOO 趨勢圖與內建時間切換軸
+    function initTradingView() {
         try {
-            tvWidget = new TradingView.widget({
-                "width": "100%",
-                "height": "100%",
-                "symbol": "AMEX:VOO", // 強制綁定 VOO 標的
+            new TradingView.widget({
+                "autosize": true,
+                "symbol": "AMEX:VOO",
                 "interval": "D",
                 "timezone": "Etc/UTC",
                 "theme": "light",
@@ -167,96 +160,92 @@
                 "locale": "zh_TW",
                 "toolbar_bg": "#f1f3f6",
                 "enable_publishing": false,
-                "hide_side_toolbar": false,
+                "withdate_ranges": true, // 強制開啟包含 1M, 3M, 1Y, MAX 的時間選擇工具
+                "hide_side_toolbar": true,
                 "allow_symbol_change": false,
-                "container_id": "tradingview_voo_chart"
+                "container_id": "tradingview_voo_widget"
             });
         } catch (e) {
-            showError("TradingView 圖表元件載入失敗，可能免費用戶端腳本暫時受阻。");
+            document.getElementById('global-error').style.display = 'block';
+            document.getElementById('global-error').innerText = "TradingView 伺服器連線異常，走勢圖暫時無法載入。";
         }
     }
 
-    // 2. 獲取免費的 Google 新聞 RSS 數據 (純瀏覽器前端動態解析)
-    function fetchVooNews() {
-        const newsContainer = document.getElementById('news-container');
-        const newsLoading = document.getElementById('news-loading');
+    // 2. 修復後的跨網域免 API 新聞抓取邏輯
+    function fetchNews() {
+        const container = document.getElementById('news-container');
+        const loading = document.getElementById('news-loading');
         
-        const feedUrl = encodeURIComponent('https://google.com');
-        const apiUrl = `https://rss2json.com{feedUrl}`;
+        // 更換為更穩定的萬國通用免費公共跨網域解析器，解決 GitHub Pages 的 CORS 阻擋
+        const rssTarget = encodeURIComponent('https://google.com');
+        const proxyUrl = `https://allorigins.win{rssTarget}`;
 
-        fetch(apiUrl)
-            .then(response => {
-                if (!response.ok) throw new Error("網路回應異常");
-                return response.json();
+        fetch(proxyUrl)
+            .then(res => {
+                if (!res.ok) throw new Error();
+                return res.json();
             })
             .then(data => {
-                newsLoading.style.display = 'none';
-                newsContainer.innerHTML = '';
+                loading.style.display = 'none';
+                container.innerHTML = '';
                 
-                if (data.status === 'ok' && data.items && data.items.length > 0) {
-                    // 掏出前 6 條最新新聞
-                    const items = data.items.slice(0, 6);
-                    items.forEach(item => {
-                        const li = document.createElement('li');
-                        li.className = 'news-item';
-                        
-                        const pubDate = new Date(item.pubDate).toLocaleDateString('zh-TW', {
-                            year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute:'2-digit'
-                        });
+                // 解析純文本 XML
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(data.contents, "text/xml");
+                const items = xmlDoc.getElementsByTagName("item");
 
-                        li.innerHTML = `
-                            <a href="${item.link}" target="_blank" rel="noopener noreferrer">${item.title}</a>
-                            <div class="news-meta">來源: ${item.author || '財經媒體'} | 發佈時間: ${pubDate}</div>
-                        `;
-                        newsContainer.appendChild(li);
+                if(items.length === 0) {
+                    throw new Error();
+                }
+
+                // 掏出前 6 條最新新聞展示
+                for (let i = 0; i < Math.min(items.length, 6); i++) {
+                    const title = items[i].getElementsByTagName("title")[0].textContent;
+                    let link = items[i].getElementsByTagName("link")[0].textContent;
+                    const pubDate = new Date(items[i].getElementsByTagName("pubDate")[0].textContent).toLocaleDateString('zh-TW', {
+                        month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit'
                     });
-                } else {
-                    throw new Error("未獲取到有效的新聞內容");
+                    const source = items[i].getElementsByTagName("source")[0] ? items[i].getElementsByTagName("source")[0].textContent : '財經媒體';
+
+                    const li = document.createElement('li');
+                    li.className = 'news-item';
+                    li.innerHTML = `
+                        <a href="${link}" target="_blank" rel="noopener noreferrer">${title}</a>
+                        <div class="news-meta">來源: ${source} | 時間: ${pubDate}</div>
+                    `;
+                    container.appendChild(li);
                 }
             })
-            .catch(error => {
-                newsLoading.innerText = "新聞暫時無法載入";
-                showError("免費新聞饋送接口失效或超額。僅顯示此錯誤，不轉用任何付費服務。");
+            .catch(() => {
+                loading.innerText = "新聞暫時無法載入";
+                const err = document.getElementById('global-error');
+                err.style.display = 'block';
+                err.innerText = "免費新聞接口受到瀏覽器安全原則阻擋。僅顯示此警告，不轉用任何付費加載服務。";
             });
     }
 
-    // 3. 降級錯誤顯示控制
-    function showError(msg) {
-        const errorDiv = document.getElementById('global-error');
-        errorDiv.innerText = msg;
-        errorDiv.style.display = 'block';
-    }
-
-    // 4. 計時器防禦邏輯：網頁開啟期間每 15 分鐘重新整理，關閉網頁後完全停止請求
-    let totalSeconds = 15 * 60;
-    let currentSeconds = totalSeconds;
-    
-    function startCountdown() {
-        const timerDisplay = document.getElementById('countdown-timer');
-        
-        const interval = setInterval(() => {
-            currentSeconds--;
+    // 3. 網頁開啟期間每 15 分鐘重新整理
+    let timerSeconds = 15 * 60;
+    function startTimer() {
+        const display = document.getElementById('countdown-timer');
+        setInterval(() => {
+            timerSeconds--;
+            let m = Math.floor(timerSeconds / 60).toString().padStart(2, '0');
+            let s = (timerSeconds % 60).toString().padStart(2, '0');
+            display.innerText = `${m}:${s}`;
             
-            let minutes = Math.floor(currentSeconds / 60);
-            let seconds = currentSeconds % 60;
-            
-            // 格式化顯示為 00:00
-            timerDisplay.innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            
-            // 倒數結束，執行刷新
-            if (currentSeconds <= 0) {
-                currentSeconds = totalSeconds; // 重置計時
-                fetchVooNews();
-                loadTradingViewChart();
+            if (timerSeconds <= 0) {
+                timerSeconds = 15 * 60;
+                fetchNews();
+                initTradingView();
             }
         }, 1000);
     }
 
-    // 網頁加載完畢後啟動
     window.onload = function() {
-        loadTradingViewChart();
-        fetchVooNews();
-        startCountdown();
+        initTradingView();
+        fetchNews();
+        startTimer();
     };
 </script>
 

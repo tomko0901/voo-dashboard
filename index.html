@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VOO Dashboard</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f5f7fb;color:#172033;font-family:Arial,sans-serif}
+main{max-width:1000px;margin:auto;padding:22px}
+header{display:flex;justify-content:space-between;align-items:end;gap:15px;flex-wrap:wrap}
+h1{margin:0;font-size:25px}
+#price{font-size:24px;font-weight:bold}
+#change{margin-left:8px}
+.controls{margin:18px 0 10px;display:flex;gap:8px;flex-wrap:wrap}
+button{border:1px solid #ccd3df;background:white;border-radius:7px;padding:7px 13px;cursor:pointer}
+button.active,button:hover{background:#1f6feb;color:white}
+.card{background:white;border:1px solid #e1e6ef;border-radius:12px;padding:16px;margin-top:14px}
+canvas{width:100%;height:330px;display:block}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.news{border-bottom:1px solid #edf0f5;padding:10px 0}
+.news:last-child{border-bottom:0}
+.news a{color:#155dcc;text-decoration:none;font-weight:bold}
+.news a:hover{text-decoration:underline}
+small{color:#6b7280}
+.status{color:#687386;font-size:13px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}canvas{height:250px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div>
+    <h1>VOO Dashboard</h1>
+    <small>資料僅供參考，不構成投資建議</small>
+  </div>
+  <div>
+    <span id="price">載入中…</span>
+    <span id="change"></span>
+  </div>
+</header>
+
+<div class="controls">
+  <button data-range="1mo">1M</button>
+  <button data-range="3mo">3M</button>
+  <button data-range="6mo">6M</button>
+  <button data-range="1y" class="active">1Y</button>
+  <button data-range="5y">5Y</button>
+  <button data-range="max">MAX</button>
+</div>
+
+<section class="card">
+  <canvas id="chart"></canvas>
+  <div id="chartStatus" class="status">載入中…</div>
+</section>
+
+<div class="grid">
+  <section class="card">
+    <h2>最近新聞</h2>
+    <div id="news">載入中…</div>
+  </section>
+
+  <section class="card">
+    <h2>更新資訊</h2>
+    <p class="status">
+      股價及新聞資料來自免費公開資料來源。<br>
+      網頁開啟期間約每 15 分鐘更新一次。<br>
+      不使用 AI API，也不會自動切換付費服務。
+    </p>
+    <p id="lastUpdate" class="status"></p>
+  </section>
+</div>
+</main>
+
+<script>
+const chartApi =
+  range => `https://query1.finance.yahoo.com/v8/finance/chart/VOO?range=${range}&interval=1d`;
+
+const newsApi =
+  "https://query1.finance.yahoo.com/v1/finance/search?q=VOO&newsCount=8";
+
+let currentRange = "1y";
+let prices = [];
+
+const $ = id => document.getElementById(id);
+
+async function loadChart() {
+  $("chartStatus").textContent = "正在更新股價…";
+
+  try {
+    const r = await fetch(chartApi(currentRange));
+    if (!r.ok) throw new Error("股價資料無法取得");
+
+    const data = await r.json();
+    const result = data.chart.result[0];
+    const timestamps = result.timestamp || [];
+    const values = result.indicators.quote[0].close || [];
+
+    prices = timestamps
+      .map((t, i) => ({time: new Date(t * 1000), value: values[i]}))
+      .filter(x => Number.isFinite(x.value));
+
+    if (!prices.length) throw new Error("沒有股價資料");
+
+    const last = prices[prices.length - 1].value;
+    const previous = prices.length > 1
+      ? prices[prices.length - 2].value
+      : last;
+
+    const diff = last - previous;
+    const percent = previous ? diff / previous * 100 : 0;
+
+    $("price").textContent = "$" + last.toFixed(2);
+    $("change").textContent =
+      `${diff >= 0 ? "+" : ""}${diff.toFixed(2)} (${percent.toFixed(2)}%)`;
+    $("change").style.color = diff >= 0 ? "#138a4b" : "#c53030";
+
+    drawChart();
+    $("chartStatus").textContent =
+      `最後資料：${prices[prices.length - 1].time.toLocaleDateString()}`;
+  } catch (e) {
+    $("chartStatus").textContent =
+      "股價暫時無法取得，可能是免費資料來源限制。";
+  }
+}
+
+function drawChart() {
+  const canvas = $("chart");
+  const rect = canvas.getBoundingClientRect();
+  const ratio = window.devicePixelRatio || 1;
+
+  canvas.width = rect.width * ratio;
+  canvas.height = rect.height * ratio;
+
+  const ctx = canvas.getContext("2d");
+  ctx.scale(ratio, ratio);
+
+  const w = rect.width;
+  const h = rect.height;
+  const pad = 28;
+  const vals = prices.map(x => x.value);
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const range = max - min || 1;
+
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.strokeStyle = "#e7ebf2";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    const y = pad + i * (h - pad * 2) / 4;
+    ctx.beginPath();
+    ctx.moveTo(pad, y);
+    ctx.lineTo(w - pad, y);
+    ctx.stroke();
+  }
+
+  ctx.beginPath();
+  prices.forEach((p, i) => {
+    const x = pad + i * (w - pad * 2) / Math.max(prices.length - 1, 1);
+    const y = h - pad - (p.value - min) / range * (h - pad * 2);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  });
+
+  ctx.strokeStyle = "#1769e0";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = "#687386";
+  ctx.font = "12px Arial";
+  ctx.fillText("$" + max.toFixed(2), 4, pad);
+  ctx.fillText("$" + min.toFixed(2), 4, h - pad);
+}
+
+async function loadNews() {
+  $("news").textContent = "正在更新新聞…";
+
+  try {
+    const r = await fetch(newsApi);
+    if (!r.ok) throw new Error("新聞資料無法取得");
+
+    const data = await r.json();
+    const news = (data.news || []).slice(0, 8);
+
+    if (!news.length) throw new Error("沒有新聞");
+
+    $("news").innerHTML = news.map(item => {
+      const date = item.providerPublishTime
+        ? new Date(item.providerPublishTime * 1000).toLocaleDateString()
+        : "";
+
+      return `
+        <div class="news">
+          <a href="${item.link}" target="_blank" rel="noopener noreferrer">
+            ${escapeHtml(item.title || "未命名新聞")}
+          </a>
+          <br>
+          <small>${escapeHtml(item.publisher || "")} ${date}</small>
+        </div>`;
+    }).join("");
+  } catch (e) {
+    $("news").textContent =
+      "新聞暫時無法取得，可能是免費資料來源限制。";
+  }
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, c => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#039;"
+  }[c]));
+}
+
+async function updateAll() {
+  await Promise.all([loadChart(), loadNews()]);
+  $("lastUpdate").textContent =
+    "本頁最後更新：" + new Date().toLocaleString();
+}
+
+document.querySelectorAll("button").forEach(button => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+    button.classList.add("active");
+    currentRange = button.dataset.range;
+    loadChart();
+  });
+});
+
+window.addEventListener("resize", () => {
+  if (prices.length) drawChart();
+});
+
+updateAll();
+setInterval(updateAll, 15 * 60 * 1000);
+</script>
+</body>
+</html>

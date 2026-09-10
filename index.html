@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+    <!-- 強制採用 UTF-8 編碼，徹底根治 GitHub Pages 上的亂碼問題 -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VOO 股價資產看板</title>
+    <title>VOO Dashboard 看板</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -107,13 +108,14 @@
             border-radius: 4px;
             font-size: 14px;
             display: none;
+            margin-bottom: 20px;
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <!-- 頂部列與自動更新狀態 -->
+    <!-- 頂部狀態列 -->
     <div class="header">
         <h1>VOO Vanguard S&P 500 ETF 看板</h1>
         <div class="status-tag" id="update-status">
@@ -121,43 +123,43 @@
         </div>
     </div>
 
-    <!-- 錯誤顯示區域 -->
+    <!-- 錯誤回報防禦區塊 -->
     <div id="global-error" class="error-message"></div>
 
     <div class="dashboard-grid">
-        <!-- 左側：TradingView 趨勢圖與期間選擇 -->
+        <!-- 左側：TradingView 專業圖表 (自帶 1M, 3M, 1Y, MAX 等按鈕) -->
         <div class="card">
-            <h2>VOO 股價趨勢圖 (內建期間與工具切換)</h2>
+            <h2>VOO 股價趨勢圖</h2>
             <div class="chart-container">
-                <!-- TradingView Widget BEGIN -->
+                <!-- 接入 TradingView 官方免費圖表元件 -->
                 <div id="tradingview_voo_chart" style="width: 100%; height: 100%;"></div>
-                <!-- TradingView Widget END -->
             </div>
         </div>
 
-        <!-- 右側：免費最新新聞鏈接 -->
+        <!-- 右側：免費最新相關新聞連結 -->
         <div class="card">
-            <h2>VOO / S&P 500 最新相關新聞</h2>
+            <h2>VOO / S&P 500 最新新聞</h2>
             <div id="news-loading" style="color: #718096; font-size: 14px;">新聞加載中...</div>
             <ul class="news-list" id="news-container">
-                <!-- 新聞會經由免費用戶端腳本注入此處 -->
+                <!-- 新聞內容會透過免費用戶端腳本動態注入此處 -->
             </ul>
         </div>
     </div>
 </div>
 
-<!-- 載入 TradingView 官方免費嵌入指令庫 -->
+<!-- 引入 TradingView 官方免費核心渲染指令庫 -->
 <script type="text/javascript" src="https://tradingview.com"></script>
 
 <script type="text/javascript">
-    // 1. 初始化 TradingView 圖表組件 (自帶 1D, 1M, 3M, 1Y, MAX 期間選擇)
     let tvWidget = null;
+
+    // 1. 調用 TradingView 官方元件渲染 VOO 的 K 線/趨勢圖
     function loadTradingViewChart() {
         try {
             tvWidget = new TradingView.widget({
                 "width": "100%",
                 "height": "100%",
-                "symbol": "AMEX:VOO",
+                "symbol": "AMEX:VOO", // 強制綁定 VOO 標的
                 "interval": "D",
                 "timezone": "Etc/UTC",
                 "theme": "light",
@@ -170,16 +172,15 @@
                 "container_id": "tradingview_voo_chart"
             });
         } catch (e) {
-            showError("TradingView 圖表載入失敗，可能免費來源暫時不可用。");
+            showError("TradingView 圖表元件載入失敗，可能免費用戶端腳本暫時受阻。");
         }
     }
 
-    // 2. 獲取免費的 Google 新聞 RSS 數據 (免 API Key，純網頁前端解析)
+    // 2. 獲取免費的 Google 新聞 RSS 數據 (純瀏覽器前端動態解析)
     function fetchVooNews() {
         const newsContainer = document.getElementById('news-container');
         const newsLoading = document.getElementById('news-loading');
         
-        // 使用公用免費的 RSS 轉 JSON 機制，完全不涉及任何付費或私密服務
         const feedUrl = encodeURIComponent('https://google.com');
         const apiUrl = `https://rss2json.com{feedUrl}`;
 
@@ -193,41 +194,40 @@
                 newsContainer.innerHTML = '';
                 
                 if (data.status === 'ok' && data.items && data.items.length > 0) {
-                    // 僅掏出前 6 條最新新聞，維持版面乾淨
+                    // 掏出前 6 條最新新聞
                     const items = data.items.slice(0, 6);
                     items.forEach(item => {
                         const li = document.createElement('li');
                         li.className = 'news-item';
                         
-                        // 清理可能的時間字串
                         const pubDate = new Date(item.pubDate).toLocaleDateString('zh-TW', {
                             year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute:'2-digit'
                         });
 
                         li.innerHTML = `
                             <a href="${item.link}" target="_blank" rel="noopener noreferrer">${item.title}</a>
-                            <div class="news-meta">來源: ${item.author || '財經新聞'} | 發佈時間: ${pubDate}</div>
+                            <div class="news-meta">來源: ${item.author || '財經媒體'} | 發佈時間: ${pubDate}</div>
                         `;
                         newsContainer.appendChild(li);
                     });
                 } else {
-                    throw new Error("未能獲取有效新聞項目");
+                    throw new Error("未獲取到有效的新聞內容");
                 }
             })
             .catch(error => {
-                newsLoading.style.text = "新聞暫時無法載入";
-                showError("免費新聞饋送接口超出限額或失效。僅展示錯誤，不啟用任何備用付費服務。");
+                newsLoading.innerText = "新聞暫時無法載入";
+                showError("免費新聞饋送接口失效或超額。僅顯示此錯誤，不轉用任何付費服務。");
             });
     }
 
-    // 3. 錯誤中央控制顯示
+    // 3. 降級錯誤顯示控制
     function showError(msg) {
         const errorDiv = document.getElementById('global-error');
         errorDiv.innerText = msg;
         errorDiv.style.display = 'block';
     }
 
-    // 4. 「網頁開啟期間」的 15 分鐘計時器與數據重刷邏輯
+    // 4. 計時器防禦邏輯：網頁開啟期間每 15 分鐘重新整理，關閉網頁後完全停止請求
     let totalSeconds = 15 * 60;
     let currentSeconds = totalSeconds;
     
@@ -240,22 +240,19 @@
             let minutes = Math.floor(currentSeconds / 60);
             let seconds = currentSeconds % 60;
             
-            // 格式化顯示 00:00
+            // 格式化顯示為 00:00
             timerDisplay.innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             
-            // 倒數到 0，觸發重新整理
+            // 倒數結束，執行刷新
             if (currentSeconds <= 0) {
-                currentSeconds = totalSeconds; // 重置時間
-                
-                // 刷新新聞
+                currentSeconds = totalSeconds; // 重置計時
                 fetchVooNews();
-                // 重新載入圖表組件達到完全重新整理資料效果
                 loadTradingViewChart();
             }
         }, 1000);
     }
 
-    // 頁面初始化載入
+    // 網頁加載完畢後啟動
     window.onload = function() {
         loadTradingViewChart();
         fetchVooNews();

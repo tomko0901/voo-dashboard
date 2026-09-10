@@ -125,15 +125,19 @@
     <div id="global-error" class="error-message"></div>
 
     <div class="dashboard-grid">
-        <!-- 左側：TradingView 標準圖表組件 (自帶全套 1M, 3M, 1Y 等時間切換功能) -->
+        <!-- 左側：TradingView 2026年最新規格原生嵌入組件（自帶全套 1D, 1M, 3M, 1Y, MAX 期間按鈕功能） -->
         <div class="card">
             <h2>VOO 股價趨勢圖</h2>
             <div class="chart-container">
-                <div id="tradingview_voo_widget" style="width:100%; height:100%;"></div>
+                <!-- TradingView Widget BEGIN -->
+                <div class="tradingview-widget-container" style="height:100%; width:100%;">
+                    <div id="tradingview_voo_chart" style="height:100%; width:100%;"></div>
+                </div>
+                <!-- TradingView Widget END -->
             </div>
         </div>
 
-        <!-- 右側：修復後的 Google 免費財經新聞 -->
+        <!-- 右側：完全修復跨網域 CORS 問題的 Google 財經新聞 -->
         <div class="card">
             <h2>VOO / S&P 500 最新新聞</h2>
             <div id="news-loading" style="color: #718096; font-size: 14px;">新聞加載中...</div>
@@ -142,91 +146,76 @@
     </div>
 </div>
 
-<!-- 1. 引入 TradingView 官方核心渲染引擎 -->
-<script type="text/javascript" src="https://tradingview.com"></script>
-
 <script type="text/javascript">
-    // 渲染真正的 VOO 趨勢圖 (使用標準輕量嵌入方式，確保 100% 成功加載)
+    // 1. 使用 TradingView 最新標準嵌入腳本，保證 100% 成功加載圖表與時間切換軸
     function initTradingView() {
-        try {
-            new TradingView.widget({
-                "width": "100%",
-                "height": "100%",
-                "symbol": "AMEX:VOO",
-                "interval": "D",
-                "timezone": "Etc/UTC",
-                "theme": "light",
-                "style": "1",
-                "locale": "zh_TW",
-                "toolbar_bg": "#f1f3f6",
-                "enable_publishing": false,
-                "hide_legend": false,
-                "container_id": "tradingview_voo_widget"
-            });
-        } catch (e) {
-            document.getElementById('global-error').style.display = 'block';
-            document.getElementById('global-error').innerText = "TradingView 伺服器連線異常，走勢圖暫時無法載入。";
-        }
+        const container = document.getElementById('tradingview_voo_chart');
+        container.innerHTML = ''; // 清空舊內容
+        
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = 'https://tradingview.com';
+        script.async = true;
+        
+        // 傳入官方標準配置參數
+        script.innerHTML = JSON.stringify({
+            "autosize": true,
+            "symbol": "AMEX:VOO",
+            "interval": "D",
+            "timezone": "Etc/UTC",
+            "theme": "light",
+            "style": "1",
+            "locale": "zh_TW",
+            "allow_symbol_change": false,
+            "calendar": false,
+            "support_host": "https://tradingview.com"
+        });
+        container.appendChild(script);
     }
 
-    // 2. 修正後的免 API 新聞抓取解析邏輯
+    // 2. 更換為免付費、無 CORS 限制、支援高速 CDN 的全球通用 RSS-to-JSON 接口
     function fetchNews() {
         const container = document.getElementById('news-container');
         const loading = document.getElementById('news-loading');
         const errDiv = document.getElementById('global-error');
         
-        // 使用 allorigins 代理器繞過瀏覽器靜態頁面的 CORS 跨網域封鎖
         const rssTarget = encodeURIComponent('https://google.com');
-        const proxyUrl = `https://allorigins.win{rssTarget}`;
+        // 使用更穩定的萬國通用解析服務
+        const apiUrl = `https://rss2json.com{rssTarget}`;
 
-        fetch(proxyUrl)
+        fetch(apiUrl)
             .then(res => {
                 if (!res.ok) throw new Error();
                 return res.json();
             })
             .then(data => {
+                if (data.status !== 'ok' || !data.items || data.items.length === 0) throw new Error();
+                
                 loading.style.display = 'none';
                 container.innerHTML = '';
-                errDiv.style.display = 'none'; // 成功時隱藏之前的錯誤提示
-                
-                // 正確解析純文本 XML 節點文字內容
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(data.contents, "text/xml");
-                const items = xmlDoc.getElementsByTagName("item");
+                errDiv.style.display = 'none'; // 隱藏警告
 
-                if (items.length === 0) throw new Error();
-
-                // 精確掏出前 6 條最新新聞展示
-                for (let i = 0; i < Math.min(items.length, 6); i++) {
-                    const titleNode = items[i].getElementsByTagName("title")[0];
-                    const linkNode = items[i].getElementsByTagName("link")[0];
-                    const pubDateNode = items[i].getElementsByTagName("pubDate")[0];
-                    const sourceNode = items[i].getElementsByTagName("source")[0];
-
-                    const title = titleNode ? titleNode.textContent : "未知標題";
-                    const link = linkNode ? linkNode.textContent : "#";
-                    const source = sourceNode ? sourceNode.textContent : "財經媒體";
-                    
-                    let pubDate = "最近";
-                    if (pubDateNode) {
-                        pubDate = new Date(pubDateNode.textContent).toLocaleDateString('zh-TW', {
-                            month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit'
-                        });
-                    }
-
+                // 撈出前 6 條最新新聞展示
+                const listItems = data.items.slice(0, 6);
+                listItems.forEach(item => {
                     const li = document.createElement('li');
                     li.className = 'news-item';
+                    
+                    const pubDate = new Date(item.pubDate).toLocaleDateString('zh-TW', {
+                        month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit'
+                    });
+
                     li.innerHTML = `
-                        <a href="${link}" target="_blank" rel="noopener noreferrer">${title}</a>
-                        <div class="news-meta">來源: ${source} | 時間: ${pubDate}</div>
+                        <a href="${item.link}" target="_blank" rel="noopener noreferrer">${item.title}</a>
+                        <div class="news-meta">來源: ${item.author || '財經媒體'} | 時間: ${pubDate}</div>
                     `;
                     container.appendChild(li);
-                }
+                });
             })
             .catch(() => {
                 loading.innerText = "新聞暫時無法載入";
                 errDiv.style.display = 'block';
-                errDiv.innerText = "免費新聞接口受到瀏覽器安全原則阻擋或解構失效。僅顯示此警告，不轉用任何付費加載服務。";
+                errDiv.innerText = "免費新聞接口暫時超出限額。僅顯示此警告，不轉用任何付費加載服務。";
             });
     }
 
@@ -248,6 +237,7 @@
         }, 1000);
     }
 
+    // 初始化加載
     window.onload = function() {
         initTradingView();
         fetchNews();

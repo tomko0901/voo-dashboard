@@ -1,152 +1,267 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="zh-TW">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VOO Dashboard Test</title>
-
-<style>
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  background: #f5f7fb;
-  color: #172033;
-  font-family: Arial, sans-serif;
-}
-
-main {
-  max-width: 1000px;
-  margin: auto;
-  padding: 22px;
-}
-
-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 15px;
-  flex-wrap: wrap;
-}
-
-h1 {
-  margin: 0;
-  font-size: 25px;
-}
-
-h2 {
-  margin-top: 0;
-}
-
-#price {
-  font-size: 24px;
-  font-weight: bold;
-}
-
-#change {
-  margin-left: 8px;
-  color: #138a4b;
-}
-
-.controls {
-  margin: 18px 0 10px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-button {
-  border: 1px solid #ccd3df;
-  background: white;
-  border-radius: 7px;
-  padding: 7px 13px;
-  cursor: pointer;
-}
-
-button.active,
-button:hover {
-  background: #1f6feb;
-  color: white;
-}
-
-.card {
-  background: white;
-  border: 1px solid #e1e6ef;
-  border-radius: 12px;
-  padding: 16px;
-  margin-top: 14px;
-}
-
-#chart {
-  width: 100%;
-  height: 330px;
-  display: block;
-}
-
-.news {
-  border-bottom: 1px solid #edf0f5;
-  padding: 10px 0;
-}
-
-.news:last-child {
-  border-bottom: 0;
-}
-
-.news a {
-  color: #155dcc;
-  text-decoration: none;
-  font-weight: bold;
-}
-
-.news a:hover {
-  text-decoration: underline;
-}
-
-small,
-.status {
-  color: #687386;
-  font-size: 13px;
-}
-
-@media (max-width: 700px) {
-  #chart {
-    height: 250px;
-  }
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VOO 股價資產看板</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #1e293b;
+        }
+        .status-tag {
+            background-color: #e2e8f0;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .timer-highlight {
+            color: #2563eb;
+            font-weight: bold;
+        }
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 900px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 18px;
+            color: #1e293b;
+            border-left: 4px solid #2563eb;
+            padding-left: 10px;
+        }
+        .chart-container {
+            position: relative;
+            height: 500px;
+            width: 100%;
+        }
+        .news-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .news-item {
+            padding: 12px 0;
+            border-bottom: 1px solid #edf2f7;
+        }
+        .news-item:last-child {
+            border-bottom: none;
+        }
+        .news-item a {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 15px;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .news-item a:hover {
+            text-decoration: underline;
+        }
+        .news-meta {
+            font-size: 12px;
+            color: #718096;
+        }
+        .error-message {
+            background-color: #fee2e2;
+            border-left: 4px solid #ef4444;
+            color: #b91c1c;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            display: none;
+        }
+    </style>
 </head>
-
 <body>
-<main>
 
-<header>
-  <div>
-    <h1>VOO Dashboard Test</h1>
-    <small>Static test version - no API request</small>
-  </div>
+<div class="container">
+    <!-- 頂部列與自動更新狀態 -->
+    <div class="header">
+        <h1>VOO Vanguard S&P 500 ETF 看板</h1>
+        <div class="status-tag" id="update-status">
+            網頁運作中 | 下次更新倒數: <span class="timer-highlight" id="countdown-timer">15:00</span>
+        </div>
+    </div>
 
-  <div>
-    <span id="price">$482.31</span>
-    <span id="change">+0.82%</span>
-  </div>
-</header>
+    <!-- 錯誤顯示區域 -->
+    <div id="global-error" class="error-message"></div>
 
-<div class="controls">
-  <button data-range="1M">1M</button>
-  <button data-range="3M">3M</button>
-  <button data-range="6M">6M</button>
-  <button data-range="1Y" class="active">1Y</button>
-  <button data-range="5Y">5Y</button>
-  <button data-range="MAX">MAX</button>
+    <div class="dashboard-grid">
+        <!-- 左側：TradingView 趨勢圖與期間選擇 -->
+        <div class="card">
+            <h2>VOO 股價趨勢圖 (內建期間與工具切換)</h2>
+            <div class="chart-container">
+                <!-- TradingView Widget BEGIN -->
+                <div id="tradingview_voo_chart" style="width: 100%; height: 100%;"></div>
+                <!-- TradingView Widget END -->
+            </div>
+        </div>
+
+        <!-- 右側：免費最新新聞鏈接 -->
+        <div class="card">
+            <h2>VOO / S&P 500 最新相關新聞</h2>
+            <div id="news-loading" style="color: #718096; font-size: 14px;">新聞加載中...</div>
+            <ul class="news-list" id="news-container">
+                <!-- 新聞會經由免費用戶端腳本注入此處 -->
+            </ul>
+        </div>
+    </div>
 </div>
 
-<section class="card">
-  <svg id="chart" viewBox="0 0 900 330"
-       preserveAspectRatio="none"
-       aria-label="VOO sample price chart">
-  </svg>
+<!-- 載入 TradingView 官方免費嵌入指令庫 -->
+<script type="text/javascript" src="https://tradingview.com"></script>
 
-  <div id="chartStatus" class="status">
-    Sample data only. No external data request.
+<script type="text/javascript">
+    // 1. 初始化 TradingView 圖表組件 (自帶 1D, 1M, 3M, 1Y, MAX 期間選擇)
+    let tvWidget = null;
+    function loadTradingViewChart() {
+        try {
+            tvWidget = new TradingView.widget({
+                "width": "100%",
+                "height": "100%",
+                "symbol": "AMEX:VOO",
+                "interval": "D",
+                "timezone": "Etc/UTC",
+                "theme": "light",
+                "style": "1",
+                "locale": "zh_TW",
+                "toolbar_bg": "#f1f3f6",
+                "enable_publishing": false,
+                "hide_side_toolbar": false,
+                "allow_symbol_change": false,
+                "container_id": "tradingview_voo_chart"
+            });
+        } catch (e) {
+            showError("TradingView 圖表載入失敗，可能免費來源暫時不可用。");
+        }
+    }
+
+    // 2. 獲取免費的 Google 新聞 RSS 數據 (免 API Key，純網頁前端解析)
+    function fetchVooNews() {
+        const newsContainer = document.getElementById('news-container');
+        const newsLoading = document.getElementById('news-loading');
+        
+        // 使用公用免費的 RSS 轉 JSON 機制，完全不涉及任何付費或私密服務
+        const feedUrl = encodeURIComponent('https://google.com');
+        const apiUrl = `https://rss2json.com{feedUrl}`;
+
+        fetch(apiUrl)
+            .then(response => {
+                if (!response.ok) throw new Error("網路回應異常");
+                return response.json();
+            })
+            .then(data => {
+                newsLoading.style.display = 'none';
+                newsContainer.innerHTML = '';
+                
+                if (data.status === 'ok' && data.items && data.items.length > 0) {
+                    // 僅掏出前 6 條最新新聞，維持版面乾淨
+                    const items = data.items.slice(0, 6);
+                    items.forEach(item => {
+                        const li = document.createElement('li');
+                        li.className = 'news-item';
+                        
+                        // 清理可能的時間字串
+                        const pubDate = new Date(item.pubDate).toLocaleDateString('zh-TW', {
+                            year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute:'2-digit'
+                        });
+
+                        li.innerHTML = `
+                            <a href="${item.link}" target="_blank" rel="noopener noreferrer">${item.title}</a>
+                            <div class="news-meta">來源: ${item.author || '財經新聞'} | 發佈時間: ${pubDate}</div>
+                        `;
+                        newsContainer.appendChild(li);
+                    });
+                } else {
+                    throw new Error("未能獲取有效新聞項目");
+                }
+            })
+            .catch(error => {
+                newsLoading.style.text = "新聞暫時無法載入";
+                showError("免費新聞饋送接口超出限額或失效。僅展示錯誤，不啟用任何備用付費服務。");
+            });
+    }
+
+    // 3. 錯誤中央控制顯示
+    function showError(msg) {
+        const errorDiv = document.getElementById('global-error');
+        errorDiv.innerText = msg;
+        errorDiv.style.display = 'block';
+    }
+
+    // 4. 「網頁開啟期間」的 15 分鐘計時器與數據重刷邏輯
+    let totalSeconds = 15 * 60;
+    let currentSeconds = totalSeconds;
+    
+    function startCountdown() {
+        const timerDisplay = document.getElementById('countdown-timer');
+        
+        const interval = setInterval(() => {
+            currentSeconds--;
+            
+            let minutes = Math.floor(currentSeconds / 60);
+            let seconds = currentSeconds % 60;
+            
+            // 格式化顯示 00:00
+            timerDisplay.innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            // 倒數到 0，觸發重新整理
+            if (currentSeconds <= 0) {
+                currentSeconds = totalSeconds; // 重置時間
+                
+                // 刷新新聞
+                fetchVooNews();
+                // 重新載入圖表組件達到完全重新整理資料效果
+                loadTradingViewChart();
+            }
+        }, 1000);
+    }
+
+    // 頁面初始化載入
+    window.onload = function() {
+        loadTradingViewChart();
+        fetchVooNews();
+        startCountdown();
+    };
+</script>
+
+</body>
+</html>
